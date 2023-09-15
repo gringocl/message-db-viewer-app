@@ -8,19 +8,26 @@ use tauri::{command, State};
 #[command]
 async fn active_stream_names(pool: State<'_, PgPool>) -> Result<Vec<String>, ()> {
     #[derive(FromRow)]
-    pub struct StreamName(String);
+    pub struct Message {
+        stream_name: String,
+    }
 
-    let stream_names: Vec<StreamName> = sqlx::query_as(
-    "SELECT DISTINCT stream_name, MAX(global_position) FROM messages GROUP BY stream_name ORDER BY max(global_position) DESC LIMIT 25"
+    let messages = sqlx::query_as::<_, Message>(
+        "SELECT DISTINCT stream_name, MAX(global_position)
+         FROM messages
+         GROUP BY stream_name
+         ORDER BY max(global_position) DESC LIMIT 25",
     )
-    .fetch_all(pool.inner()).await.expect("Stream names from message store");
+    .fetch_all(pool.inner())
+    .await
+    .expect("Query messages for stream names");
 
-    let stream_name_strings = stream_names
+    let stream_names = messages
         .into_iter()
-        .map(|StreamName(name)| name)
+        .map(|message| message.stream_name)
         .collect();
 
-    Ok(stream_name_strings)
+    Ok(stream_names)
 }
 
 #[tokio::main]
